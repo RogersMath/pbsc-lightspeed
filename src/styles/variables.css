@@ -1,0 +1,37 @@
+:root {
+  /* --- Palette --- */
+  /* Backgrounds */
+  --bg-deep: #050b14;    /* Deep Space */
+  --bg-panel: #0f172a;   /* Panel Background */
+  --bg-card: #1e293b;    /* Card/Item Background */
+  
+  /* Accents */
+  --gold: #fdb913;       /* Primary / Action */
+  --blue: #003e7e;       /* PBSC Blue / Header */
+  --cyan: #38bdf8;       /* Info / Focus */
+  --green: #10b981;      /* Success / Merchant */
+  --red: #ef4444;        /* Danger / Miner */
+  --purple: #8b5cf6;     /* Rare / Navigator */
+  
+  /* Text */
+  --text-main: #f1f5f9;
+  --text-dim: #94a3b8;
+  
+  /* --- Borders & Effects --- */
+  --border-gold: 2px solid var(--gold);
+  --border-blue: 1px solid var(--blue);
+  --border-thin: 1px solid #334155;
+  
+  --shadow-glow: 0 0 15px rgba(253, 185, 19, 0.15);
+  --shadow-panel: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+
+  /* --- Layout --- */
+  --header-height: 64px;
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  
+  /* --- A11y --- */
+  --focus-ring: 3px solid var(--cyan);
+}

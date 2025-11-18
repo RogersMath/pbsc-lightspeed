@@ -1,0 +1,210 @@
+/* Reset & Base */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: radial-gradient(circle at center, #1a2035 0%, #000000 100%);
+  color: var(--text-main);
+  font-family: system-ui, -apple-system, sans-serif;
+  height: 100vh;
+  overflow: hidden; /* App manages scrolling internally */
+  line-height: 1.5;
+}
+
+/* --- Layout Structures --- */
+
+.app-root {
+  display: grid;
+  grid-template-rows: var(--header-height) 1fr;
+  height: 100vh;
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+.header-bar {
+  background: var(--bg-panel);
+  border-bottom: var(--border-gold);
+  padding: 0 var(--space-md);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: var(--shadow-panel);
+  z-index: 10;
+}
+
+.main-stage {
+  padding: var(--space-md);
+  overflow: hidden; /* Panels handle their own scroll */
+  position: relative;
+}
+
+.dashboard-split {
+  display: grid;
+  grid-template-columns: 320px 1fr; /* Fixed Sidebar, Fluid Main */
+  gap: var(--space-md);
+  height: 100%;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+  .dashboard-split {
+    grid-template-columns: 1fr; /* Stack vertically */
+    grid-template-rows: auto 1fr;
+  }
+}
+
+/* --- Components --- */
+
+/* Panels */
+.panel {
+  background: var(--bg-panel);
+  border: var(--border-blue);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: var(--shadow-panel);
+}
+
+.panel-header {
+  background: rgba(0, 62, 126, 0.4);
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: var(--border-thin);
+  font-weight: bold;
+  color: var(--cyan);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.panel-body {
+  padding: var(--space-md);
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Cards */
+.card {
+  background: var(--bg-card);
+  border: var(--border-thin);
+  border-radius: 6px;
+  padding: var(--space-md);
+  margin-bottom: var(--space-sm);
+}
+
+.card:hover {
+  border-color: var(--blue);
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid var(--text-dim);
+  background: var(--bg-card);
+  color: var(--text-main);
+  min-height: 44px; /* WCAG Touch Target */
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--blue);
+  border-color: var(--cyan);
+  transform: translateY(-1px);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--gold);
+  color: var(--bg-deep);
+  border: none;
+}
+.btn-primary:hover:not(:disabled) {
+  background: #eab012; /* Darker Gold */
+}
+
+.btn-danger {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: var(--red);
+  color: var(--red);
+}
+.btn-danger:hover:not(:disabled) {
+  background: var(--red);
+  color: white;
+}
+
+.btn-success {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: var(--green);
+  color: var(--green);
+}
+
+/* Inputs */
+input.btn {
+  text-align: left;
+  width: 100%;
+}
+input:focus {
+  outline: var(--focus-ring);
+}
+
+/* Modals */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: var(--space-md);
+}
+
+/* --- Animation Utilities --- */
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* --- A11y --- */
+.skip-link {
+  position: absolute;
+  top: -999px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--gold);
+  color: var(--blue);
+  padding: 1rem;
+  z-index: 999;
+  font-weight: bold;
+}
+.skip-link:focus {
+  top: 0;
+}
+
+:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
