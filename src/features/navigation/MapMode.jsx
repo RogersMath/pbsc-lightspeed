@@ -10,41 +10,150 @@ export default function MapMode() {
   const { play } = useAudio();
   const canvasRef = useRef(null);
   
+  // Viewport State
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1.0);
+  
+  // Gesture State
+  const gestureRef = useRef({
+    isDown: false,
+    startX: 0,
+    startY: 0,
+    startOffsetX: 0,
+    startOffsetY: 0,
+    hasDragged: false
+  });
+  
+  // Game State
   const [selectedId, setSelectedId] = useState(null);
   const [navInput, setNavInput] = useState({ r: '', theta: '' });
   const [isAligned, setIsAligned] = useState(false);
-
+  
   const playerLoc = LOCATIONS.find(l => l.id === state.currentLocation) || LOCATIONS[0];
   const selectedLoc = LOCATIONS.find(l => l.id === selectedId);
 
+  // --- ACTIONS ---
+
   const handleEngage = () => {
-    if (selectedLoc) {
-      play('warp'); // Sound Effect
+    if (selectedLoc && isAligned) {
+      play('click');
       dispatch({ type: 'SET_TARGET', payload: selectedId });
-      dispatch({ type: 'SET_MODE', payload: 'RUNNER' });
+      dispatch({ type: 'SET_MODE', payload: 'FLIGHT_PREP' });
     }
   };
 
-  useEffect(() => {
-    if (!selectedLoc || !navInput.r || !navInput.theta) {
-      setIsAligned(false);
-      return;
-    }
-    const rUser = parseFloat(navInput.r);
-    const tUser = parseFloat(navInput.theta);
-    const dx = selectedLoc.x - playerLoc.x;
-    const dy = selectedLoc.y - playerLoc.y;
-    const rTrue = Math.sqrt(dx*dx + dy*dy);
-    const tRad = Math.atan2(dy, dx);
-    let tTrue = (tRad * 180) / Math.PI;
-    if (tTrue < 0) tTrue += 360;
+  // --- COORDINATE UTILS ---
 
-    const rOk = Math.abs(rUser - rTrue) < 1.0;
-    const tOk = Math.abs(tUser - tTrue) < 10; 
-    setIsAligned(rOk && tOk);
-  }, [navInput, selectedLoc, playerLoc]);
+  // Converts Screen/Mouse Pixels -> Internal Canvas 800x600 Pixels
+  const getMousePos = (e) => {
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;   // Relationship bitmap vs element
+    const scaleY = canvas.height / rect.height;
+
+    return {
+      x: (e.clientX - rect.left) * scaleX,
+      y: (e.clientY - rect.top) * scaleY
+    };
+  };
+
+  // Centralized logic for "Where is this star on the screen?"
+  // Returns {x, y} or null if off screen (optional optimization)
+  const projectLocation = (loc, width, height) => {
+    const cx = width / 2;
+    const cy = height / 2;
+    const UNIT = 40 * zoom;
+    
+    // Pan Offset
+    const panX = offset.x * UNIT;
+    const panY = offset.y * UNIT; // Standardize: offset.y is positive UP
+
+    // Relative Position
+    const relX = loc.x - playerLoc.x;
+    const relY = loc.y - playerLoc.y;
+
+    // Screen Projection (Y is inverted on canvas)
+    const screenX = cx + panX + (relX * UNIT);
+    const screenY = cy - panY - (relY * UNIT); 
+
+    return { x: screenX, y: screenY };
+  };
+
+  // --- GESTURE HANDLERS ---
+
+  const handlePointerDown = (e) => {
+    const pos = getMousePos(e);
+    gestureRef.current = {
+      isDown: true,
+      startX: pos.x,
+      startY: pos.y,
+      startOffsetX: offset.x,
+      startOffsetY: offset.y,
+      hasDragged: false
+    };
+    e.target.setPointerCapture(e.pointerId);
+  };
+
+  const handlePointerMove = (e) => {
+    if (!gestureRef.current.isDown) return;
+    
+    const pos = getMousePos(e);
+    const dx = pos.x - gestureRef.current.startX;
+    const dy = pos.y - gestureRef.current.startY;
+
+    // Threshold: 5 canvas pixels
+    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+        gestureRef.current.hasDragged = true;
+    }
+
+    if (gestureRef.current.hasDragged) {
+        const unitPx = 40 * zoom;
+        setOffset({
+            x: gestureRef.current.startOffsetX + (dx / unitPx),
+            y: gestureRef.current.startOffsetY - (dy / unitPx) // Invert dy because Up is +Y in World
+        });
+    }
+  };
+
+  const handlePointerUp = (e) => {
+    e.target.releasePointerCapture(e.pointerId);
+    
+    if (!gestureRef.current.hasDragged && gestureRef.current.isDown) {
+        handleTap(e);
+    }
+    gestureRef.current.isDown = false;
+  };
+
+  const handleTap = (e) => {
+    const pos = getMousePos(e);
+    const { width, height } = canvasRef.current;
+    
+    let closest = null;
+    let minDist = 50; // Hit radius (in internal pixels)
+
+    LOCATIONS.forEach(loc => {
+        const screenPos = projectLocation(loc, width, height);
+        const dist = Math.sqrt(Math.pow(pos.x - screenPos.x, 2) + Math.pow(pos.y - screenPos.y, 2));
+        
+        if (dist < minDist) {
+            minDist = dist;
+            closest = loc;
+        }
+    });
+
+    if (closest) {
+        play('click');
+        setSelectedId(closest.id);
+    }
+  };
+
+  const handleWheel = (e) => {
+    e.preventDefault();
+    const delta = -Math.sign(e.deltaY) * 0.2;
+    setZoom(z => Math.max(0.5, Math.min(4.0, z + delta)));
+  };
+
+  // --- RENDER ---
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -55,81 +164,87 @@ export default function MapMode() {
     const cy = height / 2;
     const UNIT = 40 * zoom;
     
-    ctx.fillStyle = '#050b14';
-    ctx.fillRect(0, 0, width, height);
+    // Background
+    ctx.fillStyle = '#050b14'; ctx.fillRect(0, 0, width, height);
 
-    ctx.strokeStyle = '#1e293b';
-    ctx.lineWidth = 1;
+    // Calculate Pan in Pixels
     const panX = offset.x * UNIT;
     const panY = offset.y * UNIT;
 
+    // Grid
+    ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 1;
+    
+    // Vertical Lines
+    // We calculate where the "0" line is, then draw outwards
+    const screenZeroX = cx + panX;
+    const startIdxX = Math.floor(-screenZeroX / UNIT) - 1;
+    const endIdxX = Math.floor((width - screenZeroX) / UNIT) + 1;
+    
     ctx.beginPath();
-    for (let i = -10; i <= 10; i++) {
-        const x = cx + panX + (i * UNIT);
+    for (let i = startIdxX; i <= endIdxX; i++) {
+        const x = screenZeroX + (i * UNIT);
         ctx.moveTo(x, 0); ctx.lineTo(x, height);
-        const y = cy + panY + (i * UNIT);
-        ctx.moveTo(0, y); ctx.lineTo(width, y);
+    }
+    
+    // Horizontal Lines (Remember Y is inverted visually)
+    const screenZeroY = cy - panY;
+    const startIdxY = Math.floor((screenZeroY - height) / UNIT) - 1;
+    const endIdxY = Math.floor(screenZeroY / UNIT) + 1;
+
+    for (let i = startIdxY; i <= endIdxY; i++) {
+         const y = screenZeroY - (i * UNIT);
+         ctx.moveTo(0, y); ctx.lineTo(width, y);
     }
     ctx.stroke();
 
+    // Draw Locations
     LOCATIONS.forEach(loc => {
-      const relX = loc.x - playerLoc.x;
-      const relY = loc.y - playerLoc.y;
-      const screenX = cx + panX + (relX * UNIT);
-      const screenY = cy + panY - (relY * UNIT);
+      const pos = projectLocation(loc, width, height);
+      
+      // Line from center
+      const origin = projectLocation(playerLoc, width, height); // Should match screen center if offset is 0
+      
+      // Optimization: Check bounds
+      if (pos.x < -50 || pos.x > width + 50 || pos.y < -50 || pos.y > height + 50) return;
 
+      // Connection Line
       ctx.strokeStyle = 'rgba(56, 189, 248, 0.1)';
-      ctx.beginPath();
-      ctx.moveTo(cx + panX, cy + panY);
-      ctx.lineTo(screenX, screenY);
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(origin.x, origin.y); ctx.lineTo(pos.x, pos.y); ctx.stroke();
 
-      ctx.font = `${24 * zoom}px sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(loc.icon, screenX, screenY);
+      // Icon
+      ctx.font = `${24 * zoom}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(loc.icon, pos.x, pos.y);
       
-      ctx.fillStyle = '#94a3b8';
-      ctx.font = `bold ${12 * zoom}px sans-serif`;
-      ctx.fillText(loc.name, screenX, screenY + (24 * zoom));
+      // Text
+      ctx.fillStyle = '#94a3b8'; ctx.font = `bold ${12 * zoom}px sans-serif`;
+      ctx.fillText(loc.name, pos.x, pos.y + (24 * zoom));
       
-      ctx.font = `${10 * zoom}px monospace`;
-      ctx.fillText(`(${loc.x}, ${loc.y})`, screenX, screenY + (34 * zoom));
-
+      // Selection Circle
       if (loc.id === selectedId) {
-        ctx.strokeStyle = '#fdb913';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(screenX, screenY, 20 * zoom, 0, Math.PI * 2);
-        ctx.stroke();
+        ctx.strokeStyle = '#fdb913'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(pos.x, pos.y, 25 * zoom, 0, Math.PI * 2); ctx.stroke();
       }
     });
 
-    const px = cx + panX;
-    const py = cy + panY;
-    ctx.fillStyle = '#38bdf8';
-    ctx.beginPath();
-    ctx.arc(px, py, 6 * zoom, 0, Math.PI * 2);
-    ctx.fill();
+    // Draw Player
+    const center = projectLocation(playerLoc, width, height);
+    ctx.fillStyle = '#38bdf8'; ctx.beginPath(); ctx.arc(center.x, center.y, 8 * zoom, 0, Math.PI * 2); ctx.fill();
     
+    // Draw Vector
     if (navInput.r && navInput.theta) {
       const r = parseFloat(navInput.r);
       const theta = parseFloat(navInput.theta);
       const dest = polarToCartesian(r, theta);
-      const dx = dest.x * UNIT;
-      const dy = dest.y * UNIT;
-      const endX = px + dx;
-      const endY = py - dy; 
+      
+      // Calculate endpoint relative to player
+      const endX = center.x + (dest.x * UNIT);
+      const endY = center.y - (dest.y * UNIT); // Invert Y for screen
 
       ctx.strokeStyle = isAligned ? '#10b981' : '#ef4444';
-      ctx.setLineDash([10, 5]);
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(px, py);
-      ctx.lineTo(endX, endY);
-      ctx.stroke();
-      ctx.setLineDash([]);
+      ctx.setLineDash([10, 5]); ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(center.x, center.y); ctx.lineTo(endX, endY); ctx.stroke(); ctx.setLineDash([]);
     }
+
   }, [offset, zoom, selectedId, navInput, playerLoc, isAligned]);
 
   useEffect(() => {
@@ -139,81 +254,84 @@ export default function MapMode() {
     return () => cancelAnimationFrame(frameId);
   }, [draw]);
 
-  const handleCanvasClick = () => {
-    play('click');
-    const currentIdx = LOCATIONS.findIndex(l => l.id === selectedId);
-    const nextIdx = (currentIdx + 1) % LOCATIONS.length;
-    const nextLoc = LOCATIONS[nextIdx];
-    
-    if (nextLoc.id === playerLoc.id) {
-        const skipIdx = (nextIdx + 1) % LOCATIONS.length;
-        setSelectedId(LOCATIONS[skipIdx].id);
-    } else {
-        setSelectedId(nextLoc.id);
-    }
-  };
+  // --- MATH CHECK ---
+  useEffect(() => {
+    if (!selectedLoc || !navInput.r || !navInput.theta) { setIsAligned(false); return; }
+    const rUser = parseFloat(navInput.r);
+    const tUser = parseFloat(navInput.theta);
+    const dx = selectedLoc.x - playerLoc.x;
+    const dy = selectedLoc.y - playerLoc.y;
+    const rTrue = Math.sqrt(dx*dx + dy*dy);
+    const tRad = Math.atan2(dy, dx);
+    let tTrue = (tRad * 180) / Math.PI;
+    if (tTrue < 0) tTrue += 360;
+    const rOk = Math.abs(rUser - rTrue) < 1.0;
+    const tOk = Math.abs(tUser - tTrue) < 10; 
+    setIsAligned(rOk && tOk);
+  }, [navInput, selectedLoc, playerLoc]);
+
 
   return (
     <div className="dashboard-split">
       <div className="panel">
-        <div className="panel-header">
-          <span>Navigation Computer</span>
-          <Navigation size={18} />
-        </div>
+        <div className="panel-header"><span>Navigation Computer</span><Navigation size={18} /></div>
         <div className="panel-body" style={{ display: 'flex', flexDirection: 'column' }}>
-          {selectedLoc ? (
-            <div className="card animate-fade-in" style={{ border: 'var(--border-gold)' }}>
-              <h3 style={{ color: 'var(--gold)', marginBottom: '0.5rem' }}>{selectedLoc.name}</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', fontSize: '0.8rem', gap: '0.5rem', fontFamily: 'monospace' }}>
-                <div><span style={{ color: 'var(--text-dim)' }}>DEST X:</span> {selectedLoc.x}</div>
-                <div><span style={{ color: 'var(--text-dim)' }}>DEST Y:</span> {selectedLoc.y}</div>
-                <div><span style={{ color: 'var(--text-dim)' }}>CURR X:</span> {playerLoc.x}</div>
-                <div><span style={{ color: 'var(--text-dim)' }}>CURR Y:</span> {playerLoc.y}</div>
-              </div>
-            </div>
-          ) : (
-            <div className="card" style={{ fontStyle: 'italic', color: 'var(--text-dim)', textAlign: 'center' }}>
-              No Target Selected.<br/>Click map to scan.
-            </div>
-          )}
+          
+          <div style={{ flex: 1 }}>
+             {selectedLoc ? (
+                <div className="card animate-fade-in" style={{ border: 'var(--border-gold)' }}>
+                  <h3 style={{ color: 'var(--gold)' }}>{selectedLoc.name}</h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.8rem', fontFamily: 'monospace', color: 'var(--text-dim)' }}>
+                     <div>X: {selectedLoc.x}</div>
+                     <div>Y: {selectedLoc.y}</div>
+                  </div>
+                </div>
+             ) : (
+                <div className="card" style={{ borderLeft: '4px solid var(--cyan)' }}>
+                   <div>Select a Destination</div>
+                   <div style={{fontSize:'0.8rem', color:'var(--text-dim)', marginTop:'0.25rem'}}>Tap any star system on the map</div>
+                </div>
+             )}
 
-          <div style={{ marginTop: '1rem', flex: 1 }}>
-            <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--cyan)' }}>VECTOR INPUT (POLAR)</label>
-            <div style={{ display: 'grid', gap: '0.5rem', marginTop: '0.5rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span style={{ width: '20px', fontWeight: 'bold' }}>r</span>
-                <input type="number" className="btn" style={{ flex: 1, background: '#000' }} placeholder="Dist" value={navInput.r} onChange={e => setNavInput({ ...navInput, r: e.target.value })} />
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span style={{ width: '20px', fontWeight: 'bold' }}>θ</span>
-                <input type="number" className="btn" style={{ flex: 1, background: '#000' }} placeholder="Deg" value={navInput.theta} onChange={e => setNavInput({ ...navInput, theta: e.target.value })} />
-              </div>
-            </div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-dim)', marginTop: '0.5rem' }}>
-               Calculate distance and angle from Current to Dest.
-            </div>
+             <div style={{ marginTop: '1rem' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--cyan)' }}>VECTOR INPUT</label>
+                <div style={{ display: 'grid', gap: '0.5rem', marginTop: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ width: '20px', fontWeight: 'bold' }}>r</span>
+                    <input type="number" className="btn" style={{ flex: 1, background: '#000' }} placeholder="Distance" value={navInput.r} onChange={e => setNavInput({ ...navInput, r: e.target.value })} />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ width: '20px', fontWeight: 'bold' }}>θ</span>
+                    <input type="number" className="btn" style={{ flex: 1, background: '#000' }} placeholder="Degrees" value={navInput.theta} onChange={e => setNavInput({ ...navInput, theta: e.target.value })} />
+                  </div>
+                </div>
+             </div>
           </div>
 
           <div style={{ marginTop: 'auto', display: 'grid', gap: '0.5rem' }}>
             <button className={`btn ${isAligned ? 'btn-primary' : ''}`} disabled={!isAligned} onClick={handleEngage}>
-              <Target size={18} /> {isAligned ? 'ENGAGE WARP' : 'ALIGN VECTOR'}
+              <Target size={18} /> {isAligned ? 'PREPARE FOR LAUNCH' : 'ALIGN VECTOR'}
             </button>
-            <button className="btn" onClick={() => { play('click'); dispatch({ type: 'SET_MODE', payload: 'STATION' }); }}>
-              <ArrowLeft size={18} /> Cancel
-            </button>
+            <button className="btn" onClick={() => dispatch({ type: 'SET_MODE', payload: 'STATION' })}><ArrowLeft size={18} /> Cancel</button>
           </div>
         </div>
       </div>
 
-      <div className="panel" style={{ position: 'relative', background: '#000' }}>
-        <canvas ref={canvasRef} width={800} height={600} onClick={handleCanvasClick} style={{ width: '100%', height: '100%', cursor: 'crosshair' }} />
+      <div className="panel" style={{ position: 'relative', background: '#000', overflow: 'hidden' }}>
+        <canvas 
+          ref={canvasRef} width={800} height={600} 
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerLeave={handlePointerUp} 
+          onWheel={handleWheel}
+          style={{ width: '100%', height: '100%', cursor: 'grab', touchAction: 'none' }} 
+        />
+        
         <div style={{ position: 'absolute', bottom: '1rem', right: '1rem', display: 'flex', gap: '0.5rem' }}>
-           <button className="btn" onClick={() => setZoom(z => Math.max(0.5, z - 0.2))}><ZoomOut size={20} /></button>
+           <button className="btn" onClick={() => setZoom(z => Math.max(0.5, z - 0.5))}><ZoomOut size={20} /></button>
            <button className="btn" onClick={() => setOffset({x:0, y:0})}><MapIcon size={20} /></button>
-           <button className="btn" onClick={() => setZoom(z => Math.min(3.0, z + 0.2))}><ZoomIn size={20} /></button>
-        </div>
-        <div style={{ position: 'absolute', top: '1rem', left: '1rem', background: 'rgba(0,0,0,0.5)', padding: '0.5rem', borderRadius: '4px', color: 'var(--cyan)', fontSize: '0.8rem', fontFamily: 'monospace' }}>
-           PAN: {offset.x.toFixed(1)}, {offset.y.toFixed(1)} | ZOOM: {zoom.toFixed(1)}x
+           <button className="btn" onClick={() => setZoom(z => Math.min(4.0, z + 0.5))}><ZoomIn size={20} /></button>
         </div>
       </div>
     </div>

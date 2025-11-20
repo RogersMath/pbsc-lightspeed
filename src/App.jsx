@@ -11,6 +11,8 @@ import './styles/global.css';
 import StationMode from './features/station/StationMode';
 import MapMode from './features/navigation/MapMode';
 import RunnerMode from './features/runner/RunnerMode';
+import MainMenu from './features/menu/MainMenu';
+import FlightPrepMode from './features/navigation/FlightPrepMode';
 
 function MissionSummary() {
   const { state, dispatch } = useGame();
@@ -58,12 +60,16 @@ function GameShell() {
   // Mode Router
   const renderMode = () => {
     switch(state.currentMode) {
+      case 'MENU': return <MainMenu />; 
       case 'MAP': return <MapMode />;
+      case 'FLIGHT_PREP': return <FlightPrepMode />; // Add this
       case 'RUNNER': return <RunnerMode />;
       case 'STATION': 
       default: return <StationMode />;
     }
   };
+
+  const showHeader = state.currentMode !== 'MENU';
 
   return (
     <div className="app-root">

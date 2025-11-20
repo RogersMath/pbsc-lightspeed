@@ -6,19 +6,20 @@ const GameContext = createContext();
 const INITIAL_STATE = {
   credits: 500,
   fuel: 100,
-  currentMode: 'STATION', // STATION | MAP | RUNNER
+  currentMode: 'MENU', // Start here!, // MENU | STATION | MAP | FLIGHT_PREP | RUNNER
   currentLocation: 'home',
   targetLocation: null,
   
+  // FEATURE FLAG: Accessibility Preference
+  runnerInterface: 'flight', // 'flight' | 'tactical'
+
   reputation: {
     navigators: 0,
     miners: 0,
     merchants: 0
   },
   
-  // Shared inventory for Materials (strings) and Items (blueprints)
   inventory: {},
-  
   activeContract: null,
   lastRunResult: null
 };
@@ -30,12 +31,23 @@ function gameReducer(state, action) {
       
     case 'SET_TARGET':
       return { ...state, targetLocation: action.payload };
+
+    case 'SET_RUNNER_INTERFACE':
+      return { ...state, runnerInterface: action.payload };
+    
+    case 'RESET_GAME':
+      // Clear local storage to be safe
+      localStorage.removeItem('LSNavigator_Save_v3');
+      // Return the fresh initial state, but ensure we start at STATION
+      return { 
+        ...INITIAL_STATE, 
+        currentMode: 'STATION' 
+      };
       
     case 'ACCEPT_CONTRACT':
       return { 
         ...state, 
         activeContract: action.payload,
-        // Auto-set target if it's a travel contract
         targetLocation: action.payload.type === 'travel' ? action.payload.destinationId : state.targetLocation
       };
 
@@ -45,28 +57,20 @@ function gameReducer(state, action) {
     case 'CRAFT_ITEM': {
       const bp = action.payload;
       const newInv = { ...state.inventory };
-      
-      // Deduct materials
       Object.entries(bp.materials).forEach(([mat, qty]) => {
         newInv[mat] = (newInv[mat] || 0) - qty;
       });
-      
-      // Add item
       newInv[bp.id] = (newInv[bp.id] || 0) + 1;
-      
       return { ...state, inventory: newInv };
     }
 
     case 'SELL_ITEM': {
       const { id, qty, value } = action.payload;
       const newInv = { ...state.inventory };
-      
-      // Remove items
       if (newInv[id]) {
         newInv[id] = Math.max(0, newInv[id] - qty);
         if (newInv[id] === 0) delete newInv[id];
       }
-
       return {
         ...state,
         credits: state.credits + (value * qty),
@@ -79,7 +83,6 @@ function gameReducer(state, action) {
       const contract = state.activeContract;
       let isMissionSuccess = false;
       
-      // 1. Update Inventory with gathered materials
       const updatedInv = { ...state.inventory };
       if (runStats.collectedMaterials) {
         Object.entries(runStats.collectedMaterials).forEach(([mat, qty]) => {
@@ -87,14 +90,12 @@ function gameReducer(state, action) {
         });
       }
 
-      // 2. Check Contract
       if (contract) {
         if (contract.type === 'travel' || contract.type === 'mining') {
            isMissionSuccess = checkContractCompletion(contract, runStats, updatedInv);
         }
       }
 
-      // 3. Calculate Rewards
       let newCredits = state.credits;
       let newRep = { ...state.reputation };
       let rewardSummary = null;
@@ -109,16 +110,12 @@ function gameReducer(state, action) {
       } else if (contract && (contract.type === 'travel' || contract.type === 'mining')) {
         rewardSummary = { success: false, message: 'Contract Objectives Not Met' };
       } else {
-        // Successful landing without a specific mission
         rewardSummary = { 
           success: true, 
           message: 'Sector Traversal Complete', 
           rewards: { credits: 0, reputation: {} } 
         };
       }
-
-      // If we failed a run (crashed), we might lose fuel but not move? 
-      // For MVP simplicity, we always consume fuel and return to station on 'COMPLETE_RUN'.
       
       return {
         ...state,
@@ -137,6 +134,10 @@ function gameReducer(state, action) {
     case 'DISMISS_SUMMARY':
       return { ...state, lastRunResult: null };
       
+    // DEV TOOL: Call this to fix broken saves
+    case 'RESET_STATE':
+      return INITIAL_STATE;
+
     default:
       return state;
   }
@@ -146,8 +147,20 @@ export function GameProvider({ children }) {
   const [state, dispatch] = useReducer(gameReducer, INITIAL_STATE, (initial) => {
     try {
       const saved = localStorage.getItem('LSNavigator_Save_v3');
-      return saved ? JSON.parse(saved) : initial;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // SMART MERGE: Keeps new fields from INITIAL_STATE if they are missing in parsed
+        // This fixes the issue where 'runnerInterface' was undefined in old saves.
+        return { 
+            ...initial, 
+            ...parsed,
+            // Force a valid value if missing
+            runnerInterface: parsed.runnerInterface || 'flight' 
+        };
+      }
+      return initial;
     } catch (e) {
+      console.error("Save file corrupted, resetting.", e);
       return initial;
     }
   });
