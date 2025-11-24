@@ -1,3 +1,4 @@
+// src/App.jsx
 import React from 'react';
 import { GameProvider, useGame } from './core/GameContext';
 import { useTranslation } from './core/i18n';

@@ -1,3 +1,4 @@
+// src/features/station/StationMode.jsx
 import React, { useState } from 'react';
 import { useGame } from '../../core/GameContext';
 import { useTranslation } from '../../core/i18n';

@@ -1,4 +1,4 @@
-// Basic conversion constants
+// src/core/mathUtils.js
 export const toRad = (deg) => (deg * Math.PI) / 180;
 export const toDeg = (rad) => (rad * 180) / Math.PI;
 

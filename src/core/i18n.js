@@ -1,3 +1,4 @@
+// src/core/i18n.js
 import { useState, useCallback } from 'react';
 
 const DICTIONARY = {

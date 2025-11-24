@@ -1,3 +1,4 @@
+// src/core/gameLogic.js
 export const checkContractCompletion = (contract, runStats, inventory) => {
   if (!contract) return false;
 

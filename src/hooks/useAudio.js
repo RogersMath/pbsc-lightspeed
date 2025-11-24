@@ -1,3 +1,4 @@
+// src/hooks/useAudio
 import { useCallback } from 'react';
 import { SFX } from '../core/AudioSynth';
 

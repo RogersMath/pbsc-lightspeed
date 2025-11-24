@@ -1,3 +1,4 @@
+// src/features/menu/MainMenu.jsx
 import React, { useState, useEffect } from 'react';
 import { useGame } from '../../core/GameContext';
 import { useAudio } from '../../hooks/useAudio';

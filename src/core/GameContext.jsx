@@ -1,3 +1,4 @@
+// src/core/GameContext.jsx
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import { checkContractCompletion, calculateRewards } from './gameLogic';
 

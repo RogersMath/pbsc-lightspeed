@@ -1,5 +1,5 @@
 /**
- * A pure Web Audio API synthesizer.
+ * src/core/AudioSynth.js A pure Web Audio API synthesizer.
  * Generates sounds procedurally without external assets.
  */
 

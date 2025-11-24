@@ -1,3 +1,4 @@
+// src/features/navigation/FlightPrepMode.jsx
 import React from 'react';
 import { useGame } from '../../core/GameContext';
 import { Smartphone, Monitor, ArrowLeft, Zap } from 'lucide-react';

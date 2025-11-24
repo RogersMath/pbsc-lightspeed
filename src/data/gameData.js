@@ -1,3 +1,4 @@
+// src/data/gameData.js
 export const GUILDS = {
   NAVIGATORS: { id: 'navigators', name: 'Navigator\'s Guild', icon: '🧭', color: 'var(--purple)', description: 'Masters of astrogation and mapping.' },
   MINERS: { id: 'miners', name: 'Miner\'s Alliance', icon: '⛏️', color: 'var(--red)', description: 'The backbone of resource extraction.' },

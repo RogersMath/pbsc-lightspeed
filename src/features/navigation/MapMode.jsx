@@ -1,3 +1,4 @@
+// src/features/navigation/MapMode.jsx
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useGame } from '../../core/GameContext';
 import { LOCATIONS } from '../../data/gameData';

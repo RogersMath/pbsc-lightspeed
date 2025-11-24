@@ -1,3 +1,4 @@
+// src/core/useGameLoop.js
 import { useEffect, useRef } from 'react';
 
 export const useGameLoop = (callback, isRunning) => {

@@ -1,3 +1,4 @@
+// src/features/runner/RunnerMode.jsx
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { useGame } from '../../core/GameContext';
 import { useGameLoop } from '../../core/useGameLoop';
